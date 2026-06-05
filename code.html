@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCB Trace Width Calculator (IPC-2221)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="calculator-card">
+        <header>
+            <h1>PCB Trace Width Calculator</h1>
+            <p>Calculate trace width profiles for KiCad deployment using IPC-2221 standards.</p>
+        </header>
+
+        <form id="calc-form">
+            <div class="input-group">
+                <label for="current">Target Current (Amps)</label>
+                <input type="number" id="current" step="0.1" value="1.0" min="0.1" required>
+            </div>
+
+            <div class="input-group">
+                <label for="temp-rise">Allowed Temp Rise (°C)</label>
+                <input type="number" id="temp-rise" step="1" value="10" min="1" required>
+            </div>
+
+            <div class="input-group">
+                <label for="coppershift">Copper Weight / Thickness</label>
+                <select id="copper-thickness">
+                    <option value="0.035">1 oz/ft² (0.035 mm) - Standard</option>
+                    <option value="0.070">2 oz/ft² (0.070 mm) - Thick</option>
+                    <option value="0.0175">0.5 oz/ft² (0.0175 mm) - Thin</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>Trace Layer Location</label>
+                <div class="radio-tile-group">
+                    <label class="radio-container">
+                        <input type="radio" name="layer" value="external" checked>
+                        <span class="tile-btn">External (Top/Bottom Layer)</span>
+                    </label>
+                    <label class="radio-container">
+                        <input type="radio" name="layer" value="internal">
+                        <span class="tile-btn">Internal (Inner Layers)</span>
+                    </label>
+                </div>
+            </div>
+        </form>
+
+        <section class="results-box">
+            <h2>Required Configuration</h2>
+            <div class="result-display">
+                <span class="value" id="output-width">0.00</span>
+                <span class="unit">mm</span>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-lbl">Required Area:</span>
+                    <span id="output-area">0.00</span> mils²
+                </div>
+                <div class="stat-item">
+                    <span class="stat-lbl">Width in Mils:</span>
+                    <span id="output-mils">0.00</span> mils
+                </div>
+            </div>
+            <div id="warning-msg" class="warning-banner hidden">
+                ⚠️ Warning: Trace is exceptionally wide. Consider increasing copper weight or routing cross layers.
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
+<style>
+
+    :root {
+    --bg-main: #0b0f19;
+    --card-bg: #111827;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --border: #1f2937;
+    --text-pure: #f9fafb;
+    --text-muted: #9ca3af;
+    --warning: #f59e0b;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-pure);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.calculator-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    padding: 30px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+header h1 {
+    font-size: 1.5rem;
+    margin-bottom: 6px;
+    color: var(--text-pure);
+}
+
+header p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    line-height: 1.4;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+input[type="number"], select {
+    width: 100%;
+    background-color: #1f2937;
+    border: 1px solid var(--border);
+    padding: 12px;
+    border-radius: 8px;
+    color: var(--text-pure);
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+    border-color: var(--accent);
+}
+
+/* Radio Option Blocks */
+.radio-tile-group {
+    display: flex;
+    gap: 10px;
+}
+
+.radio-container {
+    flex: 1;
+    cursor: pointer;
+}
+
+.radio-container input {
+    display: none;
+}
+
+.tile-btn {
+    display: block;
+    background-color: #1f2937;
+    border: 1px solid var(--border);
+    padding: 12px;
+    text-align: center;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all 0.2s;
+}
+
+.radio-container input:checked + .tile-btn {
+    background-color: var(--accent);
+    color: var(--text-pure);
+    border-color: var(--accent);
+}
+
+/* Results Display Box */
+.results-box {
+    background-color: #1f2937;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 25px;
+    border-left: 4px solid var(--accent);
+}
+
+.results-box h2 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.result-display {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-bottom: 15px;
+}
+
+.result-display .value {
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--text-pure);
+}
+
+.result-display .unit {
+    font-size: 1.2rem;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+}
+
+.stat-lbl {
+    font-weight: 600;
+    color: var(--text-pure);
+}
+
+.warning-banner {
+    background-color: rgba(245, 158, 11, 0.1);
+    border: 1px solid var(--warning);
+    color: var(--warning);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    margin-top: 15px;
+    line-height: 1.3;
+}
+
+.hidden {
+    display: none;
+}
+</style>
+
+<script>
+    
+    // IPC-2221 Calculation Parameters
+const IPC_CONSTANTS = {
+    external: { k: 0.048, b: 0.44, c: 0.725 },
+    internal: { k: 0.024, b: 0.44, c: 0.725 }
+};
+
+// DOM Input Elements
+const form = document.getElementById('calc-form');
+const currentInput = document.getElementById('current');
+const tempRiseInput = document.getElementById('temp-rise');
+const copperThicknessInput = document.getElementById('copper-thickness');
+const widthOutput = document.getElementById('output-width');
+const milsOutput = document.getElementById('output-mils');
+const areaOutput = document.getElementById('output-area');
+const warningBanner = document.getElementById('warning-msg');
+
+function calculateTraceProfile() {
+    // 1. Gather Inputs
+    const current = parseFloat(currentInput.value);
+    const tempRise = parseFloat(tempRiseInput.value);
+    const thicknessMM = parseFloat(copperThicknessInput.value);
+    const layerType = document.querySelector('input[name="layer"]:checked').value;
+
+    if (isNaN(current) || isNaN(tempRise) || current <= 0 || tempRise <= 0) return;
+
+    // Convert copper thickness from millimeters to mils (1 mm = 39.3701 mils)
+    const thicknessMils = thicknessMM * 39.3701;
+
+    // 2. Compute IPC-2221 Formula Elements
+    const coeffs = IPC_CONSTANTS[layerType];
+    
+    // Area (in mils²) = (Current / (k * (TempRise ^ b))) ^ (1 / c)
+    const denominator = coeffs.k * Math.pow(tempRise, coeffs.b);
+    const areaMilsSq = Math.pow((current / denominator), (1 / coeffs.c));
+
+    // Width (in mils) = Area / Thickness
+    const widthMils = areaMilsSq / thicknessMils;
+
+    // Convert Width from mils back to millimeters for KiCad deployment
+    const widthMM = widthMils * 0.0254;
+
+    // 3. Render Output Metrics to Screen
+    widthOutput.innerText = widthMM.toFixed(2);
+    milsOutput.innerText = widthMils.toFixed(1);
+    areaOutput.innerText = areaMilsSq.toFixed(1);
+
+    // 4. Dynamic Warning Condition (Flag traces wider than 5mm as highly critical)
+    if (widthMM > 5.0) {
+        warningBanner.classList.remove('hidden');
+    } else {
+        warningBanner.classList.add('hidden');
+    }
+}
+
+// Attach listeners across all forms to trigger recalculation instantly upon typing
+form.addEventListener('input', calculateTraceProfile);
+
+// Initial run execution loop on document readiness
+calculateTraceProfile();
+
+</script>
